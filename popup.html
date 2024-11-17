@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Auto-Fill Forms</title>
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        width: 300px;
+        padding: 16px;
+      }
+      #fieldList {
+        max-height: 200px;
+        overflow-y: auto;
+      }
+      .field-item {
+        display: flex;
+        align-items: center;
+        margin: 8px 0;
+      }
+      .field-checkbox {
+        margin-right: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="header">
+      <img
+        src="assets/images/icon.png"
+        id="logo"
+        alt="App Logo"
+      />
+      <h1 id="appName">Auto-Fill Forms</h1>
+    </div>
+
+    <div
+      id="toggleWrapper"
+      class="my-4"
+    ></div>
+    <div
+      id="fieldList"
+      class="hidden"
+    ></div>
+
+    <button
+      id="fillForm"
+      class="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 mt-4"
+    >
+      Generate Fill
+    </button>
+
+    <div
+      id="status"
+      class="hidden mt-4 p-2 rounded text-center"
+    ></div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Form Auto-Filler",
+  "description": "An AI powered auto form filler extension",
+  "author": "Jim Okonma",
+  "version": "1.0",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "icons": {
+    "16": "assets/images/icon.png",
+    "48": "assets/images/icon.png",
+    "128": "assets/images/icon.png"
+  },
+  "action": {
+    "default_icon": "assets/images/icon.png",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
+}
