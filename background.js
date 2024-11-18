@@ -7,19 +7,20 @@ class APIHandler {
   async loadConfig() {
     const result = await chrome.storage.local.get(["apiEndpoint"]);
     this.apiEndpoint =
-      result.apiEndpoint || " http://localhost:3030/api/forms/add"; // Default endpoint
-    console.log("Loaded API Endpoint:", this.apiEndpoint); // Log the loaded endpoint
+      result.apiEndpoint ||
+      " https://autoformfillchromeextensionserver.onrender.com/api/forms/add";
+    console.log("Loaded API Endpoint:", this.apiEndpoint);
   }
 
   async saveConfig(endpoint) {
     await chrome.storage.local.set({ apiEndpoint: endpoint });
     this.apiEndpoint = endpoint;
-    console.log("Saved API Endpoint:", this.apiEndpoint); // Log the saved endpoint
+    console.log("Saved API Endpoint:", this.apiEndpoint);
   }
 
   async getFormData(fields) {
     try {
-      console.log("Sending API request with fields:", fields); // Log the fields sent to the API
+      console.log("Sending API request with fields:", fields);
       const response = await fetch(this.apiEndpoint, {
         method: "POST",
         headers: {
@@ -49,7 +50,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .saveConfig(request.endpoint)
       .then(() => sendResponse({ success: true }))
       .catch((error) => sendResponse({ success: false, error: error.message }));
-    return true; // Keep the message channel open for async response
+    return true;
   }
 
   if (request.action === "processForm") {

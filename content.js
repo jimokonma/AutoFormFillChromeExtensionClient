@@ -1,61 +1,199 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const fillFormButton = document.getElementById("fillForm");
-  const statusDiv = document.getElementById("status");
+class FormFieldAnalyzer {
+  // New method to simulate getting data from the API
 
-  // Show status message with background color based on success or failure
-  function showStatus(message, isError = false) {
-    statusDiv.textContent = message;
-    statusDiv.style.backgroundColor = isError ? "#ffebee" : "#e8f5e9";
-    statusDiv.style.display = "block";
-    setTimeout(() => (statusDiv.style.display = "none"), 2000);
+  async sendFormDataToAPI(formName, formFields) {
+    const data = {
+      formName,
+      formTemplate: formFields.map((field) => ({
+        name: field.name,
+        type: field.type,
+        value: field.value,
+        placeholder: field.placeholder || "",
+        options: field.options || null,
+        min: field.min || "",
+        max: field.max || "",
+      })),
+    };
+
+    try {
+      const response = await fetch(
+        "https://autoformfillchromeextensionserver.onrender.com/api/forms/add",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
+        }
+      );
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("Error sending form data:", error);
+    }
   }
 
-  // When the fill form button is clicked
-  fillFormButton.addEventListener("click", async () => {
-    try {
-      // Show loading status
-      showStatus("Filling form... Please wait...");
+  async identifyAndFillFields() {
+    const fields = document.querySelectorAll("input, select, textarea");
+    const fieldInfo = [];
 
-      // Get the active tab in the current window
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-
-      if (!tab) {
-        showStatus("No active tab found", true);
-        return;
+    fields.forEach((field) => {
+      const info = this.analyzeField(field);
+      if (info) {
+        fieldInfo.push(info);
       }
+    });
 
-      // First, ensure the content script is injected
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ["content.js"],
-      });
+    // Send form data to API and handle the response
+    const formName = "contact"; // Adjust form name as needed
+    const apiResponse = await this.sendFormDataToAPI(formName, fieldInfo);
 
-      // Send message to content script to fill forms and handle response with Promise
-      const response = await new Promise((resolve) => {
-        chrome.tabs.sendMessage(tab.id, { action: "fillForm" }, (response) => {
-          if (chrome.runtime.lastError) {
-            resolve({ success: false, error: chrome.runtime.lastError });
+    if (apiResponse && apiResponse.success) {
+      apiResponse.data.forEach((fieldData) => {
+        // Find the corresponding field and populate it with the returned value
+        const field = document.querySelector(
+          `[name="${fieldData.name}"], [id="${fieldData.name}"]`
+        );
+
+        if (field) {
+          if (field.tagName.toLowerCase() === "select") {
+            this.selectOption(field, fieldData.value);
+          } else if (field.type === "radio" || field.type === "checkbox") {
+            this.checkRadioOrCheckbox(field, fieldData.value);
           } else {
-            resolve(response);
+            field.value = fieldData.value;
+            this.triggerInputEvents(field);
           }
-        });
+        } else {
+          console.warn(`Field with name or ID "${fieldData.name}" not found.`);
+        }
       });
-
-      if (response && response.success) {
-        console.log("Fields found:", response.fields);
-        showStatus(`Filled ${response.fields.length} fields`);
-      } else {
-        const errorMessage = response.error
-          ? response.error.message
-          : "Failed to fill forms";
-        showStatus(errorMessage, true);
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      showStatus("Error: " + error.message, true);
     }
-  });
+
+    // console.log("Form data processed and fields populated:", fieldInfo);
+    return fieldInfo;
+  }
+
+  analyzeField(field) {
+    const name = field.name || field.id;
+    if (!name) return null;
+
+    let options = null;
+    if (field.tagName.toLowerCase() === "select") {
+      options = Array.from(field.options).map((opt) => ({
+        value: opt.value,
+        text: opt.textContent,
+      }));
+    }
+
+    return {
+      name: name,
+      type: this.getFieldType(field),
+      value: field.value,
+      placeholder: field.placeholder || "",
+      options: options,
+      min: field.min,
+      max: field.max,
+    };
+  }
+
+  getFieldType(field) {
+    if (field.tagName.toLowerCase() === "select") return "select";
+    if (field.tagName.toLowerCase() === "textarea") return "textarea";
+    return field.type || "text";
+  }
+
+  triggerInputEvents(field) {
+    const inputEvent = new Event("input", { bubbles: true });
+    const changeEvent = new Event("change", { bubbles: true });
+
+    field.dispatchEvent(inputEvent);
+    field.dispatchEvent(changeEvent);
+  }
+
+  selectOption(field, value) {
+    // If it's a select field, choose an option different from the first (empty or placeholder)
+    const options = Array.from(field.options);
+    const validOptions = options.filter(
+      (option) =>
+        option.value &&
+        option.value.trim() !== "" &&
+        option.textContent.trim() !== "Select"
+    );
+
+    if (validOptions.length > 0) {
+      const selectedOption = validOptions.find(
+        (option) => option.value === value
+      );
+      if (selectedOption) {
+        field.value = selectedOption.value;
+      } else {
+        field.value = validOptions[0].value; // If value not found, select the first valid option
+      }
+    }
+
+    this.triggerInputEvents(field);
+  }
+
+  checkRadioOrCheckbox(field, value) {
+    if (field.type === "radio" || field.type === "checkbox") {
+      field.checked = value;
+      this.triggerInputEvents(field);
+    }
+  }
+
+  getRandomOptionFromSelect(options) {
+    // Filter out empty or placeholder options (often the first option)
+    const validOptions = options.filter(
+      (option) =>
+        option.value &&
+        option.value.trim() !== "" &&
+        !option.text.toLowerCase().includes("select") &&
+        !option.text.toLowerCase().includes("choose")
+    );
+
+    if (validOptions.length > 0) {
+      const randomIndex = Math.floor(Math.random() * validOptions.length);
+      return validOptions[randomIndex].value;
+    }
+    return "";
+  }
+
+  getRandomNumber(min, max) {
+    min = Number(min) || 0;
+    max = Number(max) || 100;
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  getRandomEmail() {
+    const domains = ["example.com", "test.com", "domain.com", "email.com"];
+    const randomDomain = domains[Math.floor(Math.random() * domains.length)];
+    return `user${Math.floor(Math.random() * 1000)}@${randomDomain}`;
+  }
+
+  generateRandomPhoneNumber() {
+    return `555-${String(Math.floor(Math.random() * 10000)).padStart(4, "0")}`;
+  }
+
+  generateRandomDate() {
+    const start = new Date(1950, 0, 1);
+    const end = new Date(2000, 11, 31);
+    const randomDate = new Date(
+      start.getTime() + Math.random() * (end.getTime() - start.getTime())
+    );
+    return randomDate.toISOString().split("T")[0];
+  }
+}
+
+// Initialize the analyzer
+const analyzer = new FormFieldAnalyzer();
+
+// Listen for messages from the popup
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "fillForm") {
+    analyzer.identifyAndFillFields().then((fields) => {
+      sendResponse({ success: true, fields: fields });
+    });
+  }
+  return true;
 });

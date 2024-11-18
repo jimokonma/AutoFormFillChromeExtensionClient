@@ -4,7 +4,7 @@
   "description": "An AI powered auto form filler extension",
   "author": "Jim Okonma",
   "version": "1.0",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "permissions": ["activeTab", "tabs", "scripting"],
   "host_permissions": ["<all_urls>"],
   "icons": {
     "16": "assets/images/icon.png",

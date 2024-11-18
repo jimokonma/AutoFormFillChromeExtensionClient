@@ -1,83 +1,8 @@
 document.addEventListener("DOMContentLoaded", () => {
   const fillFormButton = document.getElementById("fillForm");
   const statusDiv = document.getElementById("status");
-  const toggleWrapper = document.getElementById("toggleWrapper");
-  const fieldList = document.getElementById("fieldList");
 
-  let isExcludeMode = false;
-  let excludedFields = new Set();
-
-  // Create and append toggle switch
-  const toggleSwitch = document.createElement("div");
-  toggleSwitch.innerHTML = `
-    <div class="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-200 cursor-pointer">
-      <span class="inline-block h-4 w-4 transform rounded-full bg-white transition translate-x-1"></span>
-    </div>
-    <span class="ml-2 text-sm font-medium text-gray-700">Auto-fill all fields</span>
-  `;
-  toggleWrapper.appendChild(toggleSwitch);
-
-  // Toggle switch functionality
-  toggleSwitch.addEventListener("click", async () => {
-    isExcludeMode = !isExcludeMode;
-    toggleSwitch.querySelector("div").classList.toggle("bg-blue-600");
-    toggleSwitch
-      .querySelector("span.inline-block")
-      .classList.toggle("translate-x-6");
-    toggleSwitch.querySelector("span.ml-2").textContent = isExcludeMode
-      ? "Select fields to exclude"
-      : "Auto-fill all fields";
-
-    if (isExcludeMode) {
-      // Get current form fields
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-      chrome.tabs.sendMessage(
-        tab.id,
-        { action: "getFormFields" },
-        (response) => {
-          if (response && response.fields) {
-            displayFieldList(response.fields);
-          }
-        }
-      );
-    } else {
-      fieldList.innerHTML = "";
-      fieldList.classList.add("hidden");
-      excludedFields.clear();
-    }
-  });
-
-  function displayFieldList(fields) {
-    fieldList.innerHTML = "";
-    fieldList.classList.remove("hidden");
-
-    fields.forEach((field) => {
-      const fieldItem = document.createElement("div");
-      fieldItem.className = "field-item";
-      fieldItem.innerHTML = `
-        <input type="checkbox" 
-               id="${field.name}" 
-               class="field-checkbox"
-               ${!excludedFields.has(field.name) ? "checked" : ""}>
-        <label for="${field.name}">${field.name}</label>
-      `;
-
-      const checkbox = fieldItem.querySelector("input");
-      checkbox.addEventListener("change", () => {
-        if (checkbox.checked) {
-          excludedFields.delete(field.name);
-        } else {
-          excludedFields.add(field.name);
-        }
-      });
-
-      fieldList.appendChild(fieldItem);
-    });
-  }
-
+  // Show status message with background color based on success or failure
   function showStatus(message, isError = false) {
     statusDiv.textContent = message;
     statusDiv.style.backgroundColor = isError ? "#ffebee" : "#e8f5e9";
@@ -85,10 +10,13 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => (statusDiv.style.display = "none"), 2000);
   }
 
+  // When the fill form button is clicked
   fillFormButton.addEventListener("click", async () => {
     try {
+      // Show loading status
       showStatus("Filling form... Please wait...");
 
+      // Get the active tab in the current window
       const [tab] = await chrome.tabs.query({
         active: true,
         currentWindow: true,
@@ -99,31 +27,26 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      // First, ensure the content script is injected
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         files: ["content.js"],
       });
 
+      // Send message to content script to fill forms and handle response with Promise
       const response = await new Promise((resolve) => {
-        chrome.tabs.sendMessage(
-          tab.id,
-          {
-            action: "fillForm",
-            excludedFields: Array.from(excludedFields),
-          },
-          (response) => {
-            if (chrome.runtime.lastError) {
-              resolve({ success: false, error: chrome.runtime.lastError });
-            } else {
-              resolve(response);
-            }
+        chrome.tabs.sendMessage(tab.id, { action: "fillForm" }, (response) => {
+          if (chrome.runtime.lastError) {
+            resolve({ success: false, error: chrome.runtime.lastError });
+          } else {
+            resolve(response);
           }
-        );
+        });
       });
 
       if (response && response.success) {
-        const filledCount = response.fields.length - excludedFields.size;
-        showStatus(`Filled ${filledCount} fields`);
+        console.log("Fields found:", response.fields);
+        showStatus(`Filled ${response.fields.length} fields`);
       } else {
         const errorMessage = response.error
           ? response.error.message
